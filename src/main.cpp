@@ -2,24 +2,116 @@
 #include <fstream>
 #include <string>
 #include <math.h>
-#include "../include/linkedstack.hpp"
+#include "../include/linkedStack.hpp"
+#include "../include/algebricExpressionTree.hpp"
 
-#define LER 0
-#define INFIXA 1
-#define POSFIXA 2
-#define RESOLVE 3
+#define COMANDO_LER 0
+#define COMANDO_INFIXA 1
+#define COMANDO_POSFIXA 2
+#define COMANDO_RESOLVE 3
+
+#define LER_INFIXA 4
+#define LER_POSFIXA 5
+
+std::string GetExpression(std::string line, int readNotation){
+    if(readNotation == LER_INFIXA) return line.substr(12, line.size() - 12);
+    else if(readNotation == LER_POSFIXA) return line.substr(13, line.size() - 13);
+    else throw "ERRO: NOTAÇÃO INDEFINIDA";
+}
+
+int GetOperation(std::string line){
+    if (line.substr(0,6) == "INFIXA") return COMANDO_INFIXA;
+    if (line.substr(0,7) == "POSFIXA") return COMANDO_POSFIXA;
+    
+    std::string operation;
+    std::string::iterator it = line.begin();
+    while(1){
+        operation += *it;
+        it++;
+        if(*it == ' ' || *it == '\n'){
+            break;
+        }
+    }
+
+    if (operation == "LER") return COMANDO_LER;
+    else if (operation == "RESOLVE") return COMANDO_RESOLVE;
+    else throw "ERRO: Operação Inválida";
+}
+
+int GetNotation(std::string line){
+    std::string notation;
+    std::string::iterator it = line.begin();
+    int i = 0;
+
+    while(1){
+        if(i < 4){
+            it++;
+            i++;
+            continue;
+        }
+        notation += *it;
+        it++;
+        i++;
+        if(*it == ' ' || *it == '\n'){
+            break;
+        }
+    }
+
+    if (notation == "INFIXA") return LER_INFIXA;
+    else if(notation == "POSFIXA") return LER_POSFIXA;
+    else{
+        throw "ERRO: NOTAÇÃO INDEFINIDA";
+    }
+}
 
 bool isOperator(char c){
     return (c == '+' || c == '-' || c == '*' || c == '/');
 }
 
-bool ValidatePostfixNotation(std::string line) {
+bool hasOperator(std::string exp){
+    return (exp.find('+') != std::string::npos || 
+            exp.find('-') != std::string::npos ||
+            exp.find('*') != std::string::npos ||
+            exp.find('/') != std::string::npos);
+}
+
+void ConstructTreeInfix(std::string exp, bool left = true){ //o booleano diz se a expressão passada como parêntese está na esquerda ou direita do operdor
+    int i = 0;
+    if(!hasOperator(exp)){
+        i = 1;
+        if(left){
+            //adiciona folha a esquerda
+        }else{
+             //adiciona folha a direita
+        }
+    }else{
+        linkedstack<char> openParentesis;
+        int ci = 0;
+        std::string expl;
+        std::string expr;
+        for(char c : exp){
+            if(c == '('){
+                openParentesis.push('(');
+            }else if(c == ')'){
+                openParentesis.pop();
+            }else if(isOperator(c) && openParentesis.getSize() == 1){
+                //criar nó do operador e adicionar a arvore
+                expl = exp.substr(2,ci - 3); //retiro o único ( que não foi fechado
+                ConstructTreeInfix(expl, true);
+                expr = exp.substr(ci+2,exp.size() - (ci + 4)); // retiro o único ) que não foi aberto
+                ConstructTreeInfix(expr, false );
+            }
+            ci++;
+        }
+    }
+}
+
+bool ValidatePostfixNotation(std::string expr) {
     linkedstack<double> st;
     double num = 0;
     bool readingNum = false;
     bool doteWasRead = false;
     int decimalplaces = 0;
-    std::string expr = line.substr(4,line.size() - 4);
 
     for (int i = 0; i < expr.length(); i++) {
         char c = expr[i];
@@ -87,15 +179,13 @@ bool ValidatePostfixNotation(std::string line) {
     return (st.getSize() == 1);
 }
 
-
-bool ValidateInfixNotation(std::string line) {
+bool ValidateInfixNotation(std::string exp) {
     linkedstack<char> pilha;
     bool ultimoCaractereOperador = false; // indica se o último caractere foi um operador
     bool ultimoCaractereDigito = false;
     int acumuladordedigitos = 0;
     std::size_t jaexisteponto = std::string::npos; //indica se em um numero em formação já existe um .
     int ci = 0;
-    std::string exp = line.substr(4,line.size() - 4);
     if (exp.size() > 1000)
         throw "Expressão com mais caracteres que o limite máximo (1000)"; 
     for (char c : exp) {
@@ -148,40 +238,31 @@ bool ValidateInfixNotation(std::string line) {
     return pilha.empty() && !ultimoCaractereOperador; // verifica se todos os parênteses foram fechados corretamente e se o último caractere não foi um operador
 }
 
-bool ValidateEXP(std::string line){
-    if(ValidatePostfixNotation(line)) return true;
-    else if(ValidateInfixNotation(line)) return false;
-    else throw "ERRO: Expressão inválida";
-}
-
-std::string GetExpression(std::string line, bool isInvPolish){
-    
-    return "TESTE";
-}
-
-int GetOperation(std::string line){
-    if (line == "INFIXA") return INFIXA;
-    if (line == "POSFIXA") return POSFIXA;
-    
-    std::string operation;
-    std::string::iterator it = line.begin();
-    while(1){
-        operation += *it;
-        it++;
-        if(*it == ' ' || *it == '\n'){
-            break;
+bool ValidateEXP(std::string line, int readNotation){
+    if(readNotation == LER_INFIXA){
+        if(ValidateInfixNotation(line)){
+            return true;
+        }else{
+            throw "ERRO: Expressão infixa inválida";
         }
     }
-
-    if (operation == "LER") return LER;
-    else if (operation == "RESOLVE") return RESOLVE;
-    else throw "ERRO: Operação Inválida";
+    if(readNotation == LER_POSFIXA){
+        if(ValidatePostfixNotation(line)){
+            return true;
+        }else{
+            throw "ERRO: Expressão posfixa inválida";
+        }
+    }
+    throw "ERRO: Notação indefinida";
 }
 
 int main () {
   std::string line;
-  std::ifstream myfile ("../TP1entrada/entdouble.s8.n5.p.in");
-  bool isInvPolish = false;
+  std::string exp;
+  std::ifstream myfile ("../TP1entradas/entdouble.s3.n5.i.in");
+  int readNotation = -1;
+
+  algebricExpressionTree t;
 
   if (myfile.is_open())
   {
@@ -192,18 +273,20 @@ int main () {
       //std::cout << line << '\n';
       switch (GetOperation(line))
       {
-        case LER: 
-            isInvPolish = ValidateEXP(line);
-            //GetExpression(line,isInvPolish);
+        case COMANDO_LER: 
+            readNotation = GetNotation(line);
+            exp = GetExpression(line, readNotation);
+            ValidateEXP(exp,readNotation);
+            if(readNotation == LER_INFIXA) t.BuildTree(exp);
             std::cout << "E LER\n";
             break;
-        case INFIXA:
+        case COMANDO_INFIXA:
             std::cout << "E INFIXA\n";
             break;
-        case POSFIXA:
+        case COMANDO_POSFIXA:
             std::cout << "E POSFIXA\n";
             break;
-        case RESOLVE:
+        case COMANDO_RESOLVE:
             std::cout << "E RESOLVE\n";
             break;
       }
